@@ -4,7 +4,7 @@ from typing import Optional, Any, Union
 import requests
 import json
 
-from filters import Filter
+from .filters import Filter
 
 __all__ = (
     'AsyncClient',
