@@ -2,3 +2,4 @@
 setup.py
 subapy/__init__.py
 subapy/client.py
+subapy/filters.py
