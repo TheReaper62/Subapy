@@ -175,24 +175,24 @@ class Client:
             pagination = {"Range": f"{range[0]}-{range[1]}"}
         # All Rows
         if query == "all" or query == "*":
-            result = await self.send({'select': '*'}, extra_headers=pagination)
+            result = await self.async_send({'select': '*'}, extra_headers=pagination)
         elif isinstance(query, list):
             # List of Row Names
             if all(True if type(i) == str else False for i in query):
-                result = await self.send({'select': ','.join(query)}, extra_headers=pagination)
+                result = await self.async_send({'select': ','.join(query)}, extra_headers=pagination)
             # List of Filters
             elif all(True if type(i) == Filter else False for i in query):
                 filters = {k: v for d in query for k, v in d.to_dict().items()}
-                result = await self.send(filters, extra_headers=pagination)
+                result = await self.async_send(filters, extra_headers=pagination)
             else:
                 raise Exception(
                     "Query must be a list of row names or a list of filters")
         # Single row name
         elif isinstance(query, str):
-            result = await self.send({'select': query}, extra_headers=pagination)
+            result = await self.async_send({'select': query}, extra_headers=pagination)
         # Single Filter
         elif isinstance(query, Filter):
-            result = await self.send(query.to_dict(), extra_headers=pagination)
+            result = await self.async_send(query.to_dict(), extra_headers=pagination)
         else:
             raise Exception(
                 "Query must be a row name, a list of row names, a filter")
@@ -213,7 +213,7 @@ class Client:
             filters = {k: v for d in filters for k, v in d.to_dict().items()}
         elif filters != None:
             filters = filters.to_dict()
-        response = await self.send(filters, new_row, method="post", extra_headers=self.application_headers | prefer)
+        response = await self.async_send(filters, new_row, method="post", extra_headers=self.application_headers | prefer)
         return response.text
 
     async def async_update(self, new_row: dict[str, Any], filters: Union[Filter, list[Filter]]) -> Optional[dict[str, Any]]:
@@ -227,7 +227,7 @@ class Client:
             filters = {k: v for d in filters for k, v in d.to_dict().items()}
         else:
             filters = filters.to_dict()
-        response = await self.send(filters, new_row, method="patch", extra_headers=self.application_headers | {"Prefer": "return=representation"})
+        response = await self.async_send(filters, new_row, method="patch", extra_headers=self.application_headers | {"Prefer": "return=representation"})
         return response
 
     async def async_delete(self, filters: Union[Filter, list[Filter]]) -> None:
@@ -239,7 +239,7 @@ class Client:
             filters = {k: v for d in filters for k, v in d.to_dict().items()}
         else:
             filters = filters.to_dict()
-        response = await self.send(filters, method="delete")
+        response = await self.async_send(filters, method="delete")
         return response
 
     async def async_send(self, params: dict[str, Any], data: dict[str, Any] = {}, extra_headers: dict[str, Any] = {}, method="get") -> dict[str, Any]:
