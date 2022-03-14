@@ -23,8 +23,11 @@ Supports basic **CRUD** Operations: `READ`, `INSERT`, `UPDATE`, `DELETE`
 
 ## Create a new subapy Client
 `supa_client = subapy.Client(db_url='YOUR_DB_URL', api_key='YOUR_API_KEY')`
+
 **DB_URL and API_KEY are required.**
+
 *DB_URL is the unique portion of the URL of the database or the Full URL of the database server.*
+
 *You can also use anon_key or service_key to specify the API key.*
 
 
@@ -32,7 +35,7 @@ Supports basic **CRUD** Operations: `READ`, `INSERT`, `UPDATE`, `DELETE`
 **********
 ### Read all data from the database
 
-`data: list[dict[str,Any]] = supa_clieant.read('*')`
+`data: list[dict[str,Any]] = supa_client.read('*')`
 
 **equivalent to**
 
