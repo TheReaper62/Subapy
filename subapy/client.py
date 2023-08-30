@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, Iterable
 
 import requests
 import json
@@ -15,17 +15,17 @@ class Client:
     A client that communicates with SupaBase API servers.
     '''
 
-    def __init__(self, db_url: str, api_key: str, table: Optional[str]=None) -> None:
+    def __init__(self, db_id: str, api_key: str, table: Optional[str]=None) -> None:
         '''
         Initialize a client.
         anon_key or service_key can be used to specify the API key.
-        db_url represents the unique portion or the URL of the database.
-        Example: 
-        For this URL -> https://ythwdmythxedmuaprwff.supabase.co/rest/v1/main
+        db_id represents the unique portion of the URL of the database.
+        Example:
+        For this URL -> https://ythwdmythxedmuaprwff.supabase.co/rest/v1/
         'ythwdmythxedmuaprwff' is the database url.
         '''
 
-        self.base: str = f"https://{db_url}.supabase.co/rest/v1/" if not db_url.startswith('https') else db_url
+        self.base: str = f"https://{db_id}.supabase.co/rest/v1/"
         self.table: Optional[str] = table
         self.headers: dict[str,str] = {
             'apikey' : api_key,
@@ -35,7 +35,7 @@ class Client:
             "Content-Type": "application/json",
         }
 
-    def read(self, query: Any, range: Union[tuple[int],list[int]]=[]) -> dict[str,Any]:
+    def read(self, query: Any, range: Iterable[int]=[]) -> dict[str,Any]:
         '''
         Read data from the database with the option of filtering and paginating.
         Set query to '*' to read all data.
@@ -61,7 +61,7 @@ class Client:
 
         Returns a dictionary of the data queried for.
         '''
-        
+
         pagination: dict[str, str] = {}
         if range != []:
             assert len(range) in [2] and type(range) in [list,tuple], "Range must be a tuple or list of two integers"
@@ -71,27 +71,27 @@ class Client:
             result: dict[str,Any] = self.send({'select':'*'}, extra_headers=pagination).json()
         elif isinstance(query, list):
             # List of Row Names
-            if all(True if type(i)==str else False for i in query):
+            if all(True if type(i) == str else False for i in query):
                 result: dict[str,Any] = self.send({'select': ','.join(query)}, extra_headers=pagination).json()
             # List of Filters
-            elif all(True if type(i)==Filter else False for i in query):
-                filters = {k: v for d in query for k, v in d.to_dict().items()}
+            elif all(True if (isinstance(i,Filter) and not i.raw) else False for i in query):
+                filters = {k: v for d in query for k, v in d.filter.items()}
                 result: dict[str,Any] = self.send(filters, extra_headers=pagination).json()
             else:
-                raise Exception("Query must be a list of row names or a list of filters")
+                raise Exception("Query must be a list of row names or a list of filters(non-raw)")
         # Single row name
         elif isinstance(query, str):
             result: dict[str,Any] = self.send({'select': query}, extra_headers=pagination).json()
         # Single Filter
         elif isinstance(query, Filter):
-            result: dict[str,Any] = self.send(query.to_dict(), extra_headers=pagination).json()
+            result: dict[str,Any] = self.send(query.filter, extra_headers=pagination).json()
         else:
             raise Exception("Query must be a row name, a list of row names, a filter")
         return result
 
     def insert(self, new_row: Union[dict[str, Any], list[dict[str, Any]], tuple[dict[str, Any]]], filters: Union[Filter, list[Filter], None]=None, upsert: bool=False) -> Optional[dict[str, Any]]:
         '''
-        Insert a new row or multiple rows into the database. 
+        Insert a new row or multiple rows into the database.
         new_row should be a dictionary or a list/tuple of dictionaries.
         Upsert is supported, set upsert to True to update if exists and create if not. Defaults to False.
         Returns upserted row(s) or None if upsert is False.
@@ -101,9 +101,9 @@ class Client:
         else:
             prefer = {"Prefer": "return=representation"}
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         elif filters != None:
-            filters = filters.to_dict()
+            filters = filters.filter
         return self.send(filters, new_row, method="post", extra_headers=self.application_headers | prefer).text
 
     def update(self, new_row: dict[str, Any], filters: Union[Filter, list[Filter]]) -> Optional[dict[str, Any]]:
@@ -114,9 +114,9 @@ class Client:
         Returns the replaced values.
         '''
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         else:
-            filters = filters.to_dict()
+            filters = filters.filter
         return self.send(filters, new_row, method="patch", extra_headers=self.application_headers | {"Prefer": "return=representation"})
 
     def delete(self, filters: Union[Filter, list[Filter]]) -> None:
@@ -125,16 +125,15 @@ class Client:
         use filter to select the rows to delete.
         '''
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         else:
-            filters = filters.to_dict()
+            filters = filters.filter
         return self.send(filters, method="delete")
 
     def send(self, params: dict[str,Any], data: dict[str,Any]={}, extra_headers: dict[str,Any]={}, method="get") -> dict[str,Any]:
         '''
         Should not be called directly, rather, invoked by other methods.
         '''
-        
         assert self.table!=None, "Table name is required"
         response: requests.models.Response = requests.request(method, self.base + self.table, headers=self.headers | extra_headers, params=params, data=json.dumps(data))
         if not response.ok:
@@ -181,18 +180,18 @@ class Client:
             if all(True if type(i) == str else False for i in query):
                 result = await self.async_send({'select': ','.join(query)}, extra_headers=pagination)
             # List of Filters
-            elif all(True if type(i) == Filter else False for i in query):
-                filters = {k: v for d in query for k, v in d.to_dict().items()}
+            elif all(True if (isinstance(i,Filter) and not i.raw) else False for i in query):
+                filters = {k: v for d in query for k, v in d.filter.items()}
                 result = await self.async_send(filters, extra_headers=pagination)
             else:
                 raise Exception(
-                    "Query must be a list of row names or a list of filters")
+                    "Query must be a list of row names or a list of filters(non-raw)")
         # Single row name
         elif isinstance(query, str):
             result = await self.async_send({'select': query}, extra_headers=pagination)
         # Single Filter
         elif isinstance(query, Filter):
-            result = await self.async_send(query.to_dict(), extra_headers=pagination)
+            result = await self.async_send(query.filter, extra_headers=pagination)
         else:
             raise Exception(
                 "Query must be a row name, a list of row names, a filter")
@@ -200,7 +199,7 @@ class Client:
 
     async def async_insert(self, new_row: Union[dict[str, Any], list[dict[str, Any]], tuple[dict[str, Any]]], filters: Union[Filter, list[Filter], None] = None, upsert: bool = False) -> Optional[dict[str, Any]]:
         '''
-        Insert a new row or multiple rows into the database. 
+        Insert a new row or multiple rows into the database.
         new_row should be a dictionary or a list/tuple of dictionaries.
         Upsert is supported, set upsert to True to update if exists and create if not. Defaults to False.
         Returns upserted row(s) or None if upsert is False.
@@ -210,9 +209,9 @@ class Client:
         else:
             prefer = {"Prefer": "return=representation"}
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         elif filters != None:
-            filters = filters.to_dict()
+            filters = filters.filter
         response = await self.async_send(filters, new_row, method="post", extra_headers=self.application_headers | prefer)
         return response.text
 
@@ -224,9 +223,9 @@ class Client:
         Returns the replaced values.
         '''
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         else:
-            filters = filters.to_dict()
+            filters = filters.filter
         response = await self.async_send(filters, new_row, method="patch", extra_headers=self.application_headers | {"Prefer": "return=representation"})
         return response
 
@@ -236,9 +235,9 @@ class Client:
         use filter to select the rows to delete.
         '''
         if isinstance(filters, list):
-            filters = {k: v for d in filters for k, v in d.to_dict().items()}
+            filters = {k: v for d in filters for k, v in d.filter.items()}
         else:
-            filters = filters.to_dict()
+            filters = filters.filter
         response = await self.async_send(filters, method="delete")
         return response
 
@@ -246,7 +245,6 @@ class Client:
         '''
         Should not be called directly, rather, invoked by other methods.
         '''
-
         assert self.table != None, "Table name is required"
         response: requests.models.Response = requests.request(
             method, self.base + self.table, headers=self.headers | extra_headers, params=params, data=json.dumps(data))

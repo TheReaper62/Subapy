@@ -2,13 +2,13 @@ from distutils.core import setup
 setup(
     name='subapy',
     packages=['subapy'],
-    version='0.3.3',
+    version='0.4.0',
     license='MIT',
     description='Supabase API Wrapper',
     author='FishballNoodles',
     author_email='joelkhorxw@gmail.com',
     url='https://github.com/TheReaper62/Subapy',
-    download_url='https://github.com/TheReaper62/Subapy/archive/refs/tags/v0.3.3.tar.gz',
+    download_url='https://github.com/TheReaper62/Subapy/archive/refs/tags/v0.4.0.tar.gz',
     keywords=['supabase', 'api', 'wrapper','database','db'],
     install_requires=[
         'requests',
